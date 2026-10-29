@@ -5,7 +5,6 @@
   "description": "DentFlow Pro — sistema odontológico multi-tenant",
   "scripts": {
     "deploy": "bash ./deploy.sh production",
-    "deploy:preview": "bash ./deploy.sh preview",
-    "deploy:all": "bash ./deploy.sh all"
+    "deploy:preview": "bash ./deploy.sh preview"
   }
 }
