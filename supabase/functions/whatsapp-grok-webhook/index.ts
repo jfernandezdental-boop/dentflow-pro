@@ -1,23 +1,31 @@
 /**
- * whatsapp-grok-webhook — Meta/Twilio → Grok → citas/presupuestos
+ * whatsapp-grok-webhook — Meta/Twilio → Grok → citas (RLS/RPC multi-tenant)
  * Deploy: supabase functions deploy whatsapp-grok-webhook --no-verify-jwt
- * Secrets: XAI_API_KEY, WHATSAPP_PROVIDER=meta|twilio,
- * META_WA_TOKEN, META_WA_PHONE_NUMBER_ID, META_WA_VERIFY_TOKEN
- * o TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM
- * SUPABASE_SERVICE_ROLE_KEY
+ * Secrets: XAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY, WHATSAPP_PROVIDER,
+ * META_* o TWILIO_*, DEFAULT_CONSULTORIO_ID (uuid de la clinica)
+ * Requiere SQL: rls_tenant_aislamiento.sql
  */
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const SYSTEM = `Asistente WhatsApp de clínica dental (DentFlow). Español, breve. No diagnostiques.
-Intents JSON al final: confirmar_cita, cancelar_cita, reagendar_cita, enviar_presupuesto, consultar_presupuesto, hablar_humano, ninguna.`;
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+const SYSTEM = `Asistente WhatsApp clinica dental (DentFlow). Espanol, breve. No diagnostiques.
+Intents JSON al final: confirmar_cita, cancelar_cita, reagendar_cita, consultar_presupuesto, hablar_humano, ninguna.
+Solo datos del CONTEXTO.`;
 
 function json(s: number, b: unknown) {
-  return new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify(b), {
+    status: s,
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
 }
-function normPhone(p: string) { return String(p || "").replace(/\D/g, ""); }
+function normPhone(p: string) {
+  return String(p || "").replace(/\D/g, "");
+}
 function extractIntent(t: string) {
   const m = t.match(/\{[\s\n]*"intent"\s*:\s*"[^"]+"[^}]*\}/);
   if (!m) return null;
@@ -26,81 +34,102 @@ function extractIntent(t: string) {
 function stripIntent(t: string) {
   return t.replace(/\{[\s\n]*"intent"\s*:\s*"[^"]+"[^}]*\}/g, "").trim();
 }
-function sb() {
-  return createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
+function serviceClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL") || "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+  );
+}
+function resolveConsultorioId(): string | null {
+  return Deno.env.get("DEFAULT_CONSULTORIO_ID") || Deno.env.get("CONSULTORIO_ID") || null;
 }
 
 async function buildContext(phone: string) {
-  const client = sb();
-  const digits = normPhone(phone);
-  const tail = digits.slice(-9);
-  const { data: pacientes } = await client.from("pacientes").select("*").limit(300);
-  const paciente = (pacientes || []).find((p: Record<string, unknown>) => {
-    const t = normPhone(String(p.telefono || p.phone || ""));
-    return t && (t === digits || t.endsWith(tail) || digits.endsWith(t.slice(-9)));
-  }) || null;
-  const ctx: Record<string, unknown> = { telefono: phone, paciente: null, citas_proximas: [], presupuestos: [], huecos_sugeridos: [] };
-  if (!paciente) { ctx.nota = "Paciente no encontrado por teléfono"; return ctx; }
-  ctx.paciente = { id: paciente.id, nombre: paciente.nombre || paciente.name };
-  const hoy = new Date().toISOString().slice(0, 10);
-  const { data: citas } = await client.from("citas").select("*").eq("paciente_id", paciente.id).limit(20);
-  ctx.citas_proximas = (citas || []).filter((c: Record<string, unknown>) => String(c.fecha || c.dateKey || "") >= hoy).slice(0, 8);
-  try {
-    const { data: pres } = await client.from("presupuestos").select("id,estado,total,numero_factura").eq("paciente_id", paciente.id).limit(5);
-    ctx.presupuestos = pres || [];
-  } catch { /* optional table */ }
-  const huecos: { fecha: string; hora: string }[] = [];
-  for (let i = 1; i <= 7 && huecos.length < 6; i++) {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    if (d.getDay() === 0) continue;
-    const fecha = d.toISOString().slice(0, 10);
-    huecos.push({ fecha, hora: "09:00" }, { fecha, hora: "10:30" });
+  const sb = serviceClient();
+  const consultorioId = resolveConsultorioId();
+  const { data, error } = await sb.rpc("rpc_contexto_whatsapp", {
+    p_telefono: phone,
+    p_consultorio_id: consultorioId,
+  });
+  if (error) {
+    console.error("rpc_contexto_whatsapp", error);
+    return {
+      telefono: phone,
+      paciente: null,
+      citas_proximas: [],
+      presupuestos: [],
+      nota: "Error RPC contexto. Ejecutar rls_tenant_aislamiento.sql",
+    };
   }
-  ctx.huecos_sugeridos = huecos.slice(0, 6);
-  return ctx;
+  if (!data || data.ok === false) {
+    return {
+      telefono: phone,
+      paciente: null,
+      citas_proximas: [],
+      presupuestos: [],
+      nota: (data && data.error) || "paciente_no_encontrado",
+    };
+  }
+  return {
+    telefono: phone,
+    paciente: data.paciente,
+    consultorio_id: data.consultorio_id,
+    citas_proximas: data.citas_proximas || [],
+    presupuestos: data.presupuestos || [],
+  };
+}
+
+async function executeIntent(intent: Record<string, unknown> | null, ctx: Record<string, unknown>) {
+  if (!intent || !intent.intent || intent.intent === "ninguna") {
+    return { done: false, note: "" };
+  }
+  const consultorioId = String(ctx.consultorio_id || resolveConsultorioId() || "");
+  if (!consultorioId) {
+    return { done: false, note: "Sin consultorio_id: no se aplico el cambio." };
+  }
+  const sb = serviceClient();
+  const { data, error } = await sb.rpc("rpc_ejecutar_intent_whatsapp", {
+    p_intent: intent,
+    p_consultorio_id: consultorioId,
+  });
+  if (error) {
+    console.error("rpc_ejecutar_intent_whatsapp", error);
+    return { done: false, note: "No se pudo actualizar (RPC)." };
+  }
+  if (data && data.ok === false) {
+    return { done: false, note: String(data.error || "intent_fallido") };
+  }
+  return { done: true, note: "Accion: " + (data?.action || intent.intent) };
 }
 
 async function callGrok(message: string, context: Record<string, unknown>) {
   const key = Deno.env.get("XAI_API_KEY");
   if (!key) throw new Error("XAI_API_KEY missing");
   const model = Deno.env.get("XAI_MODEL") || "grok-2";
-  const res = await fetch(Deno.env.get("XAI_API_URL") || "https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
-    body: JSON.stringify({
-      model, temperature: 0.25, max_tokens: 600,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "system", content: "CONTEXTO:\n" + JSON.stringify(context) },
-        { role: "user", content: message },
-      ],
-    }),
-  });
+  const res = await fetch(
+    Deno.env.get("XAI_API_URL") || "https://api.x.ai/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + key,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.25,
+        max_tokens: 600,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "system", content: "CONTEXTO:\n" + JSON.stringify(context) },
+          { role: "user", content: message },
+        ],
+      }),
+    },
+  );
   const data = await res.json();
   if (!res.ok) throw new Error(JSON.stringify(data));
   const raw = data?.choices?.[0]?.message?.content || "";
   return { reply: stripIntent(raw) || "Gracias, un momento.", intent: extractIntent(raw) };
-}
-
-async function executeIntent(intent: Record<string, unknown> | null) {
-  if (!intent?.intent || intent.intent === "ninguna") return "";
-  const client = sb();
-  const id = String(intent.cita_id || "");
-  if (intent.intent === "confirmar_cita" && id) {
-    await client.from("citas").update({ estado: "confirmada" }).eq("id", id);
-    return "Cita confirmada.";
-  }
-  if (intent.intent === "cancelar_cita" && id) {
-    await client.from("citas").update({ estado: "cancelada" }).eq("id", id);
-    return "Cita cancelada.";
-  }
-  if (intent.intent === "reagendar_cita" && id) {
-    const patch: Record<string, unknown> = { estado: "pendiente" };
-    if (intent.fecha_preferida) { patch.fecha = intent.fecha_preferida; patch.dateKey = intent.fecha_preferida; }
-    await client.from("citas").update(patch).eq("id", id);
-    return "Reagenda registrada.";
-  }
-  return "";
 }
 
 async function sendWhatsApp(to: string, body: string) {
@@ -114,7 +143,10 @@ async function sendWhatsApp(to: string, body: string) {
     const params = new URLSearchParams({ From: from, To: toAddr, Body: body });
     await fetch("https://api.twilio.com/2010-04-01/Accounts/" + sid + "/Messages.json", {
       method: "POST",
-      headers: { Authorization: "Basic " + auth, "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        Authorization: "Basic " + auth,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
       body: params,
     });
     return;
@@ -123,8 +155,16 @@ async function sendWhatsApp(to: string, body: string) {
   const phoneId = Deno.env.get("META_WA_PHONE_NUMBER_ID") || "";
   await fetch("https://graph.facebook.com/v20.0/" + phoneId + "/messages", {
     method: "POST",
-    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", to: normPhone(to), type: "text", text: { body: body.slice(0, 4000) } }),
+    headers: {
+      Authorization: "Bearer " + token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: normPhone(to),
+      type: "text",
+      text: { body: body.slice(0, 4000) },
+    }),
   });
 }
 
@@ -136,7 +176,9 @@ serve(async (req) => {
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
     const verify = Deno.env.get("META_WA_VERIFY_TOKEN") || "dentflow_verify_2026";
-    if (mode === "subscribe" && token === verify && challenge) return new Response(challenge, { status: 200 });
+    if (mode === "subscribe" && token === verify && challenge) {
+      return new Response(challenge, { status: 200 });
+    }
     return new Response("forbidden", { status: 403 });
   }
   if (req.method !== "POST") return json(405, { error: "method" });
@@ -150,23 +192,26 @@ serve(async (req) => {
     text = String(form.get("Body") || "").trim();
   } else {
     const body = await req.json().catch(() => ({}));
-    const entry = body?.entry?.[0];
-    const value = entry?.changes?.[0]?.value;
-    const msg = value?.messages?.[0];
-    if (msg) { from = String(msg.from || ""); text = String(msg.text?.body || "").trim(); }
+    const msg = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    if (msg) {
+      from = String(msg.from || "");
+      text = String(msg.text?.body || "").trim();
+    }
   }
   if (!text) return json(200, { ok: true, ignored: true });
 
   try {
     const ctx = await buildContext(from);
     const { reply, intent } = await callGrok(text, ctx);
-    const note = await executeIntent(intent);
-    const finalReply = note ? reply + "\n\n" + note : reply;
+    const exec = await executeIntent(intent, ctx);
+    const finalReply = exec.note ? reply + "\n\n" + exec.note : reply;
     await sendWhatsApp(from, finalReply);
-    return json(200, { ok: true, intent });
+    return json(200, { ok: true, intent, tenant: ctx.consultorio_id || null });
   } catch (e) {
     console.error(e);
-    try { await sendWhatsApp(from, "Problema técnico. Intenta de nuevo o llama a la clínica."); } catch { /* */ }
+    try {
+      await sendWhatsApp(from, "Problema tecnico. Intenta de nuevo o llama a la clinica.");
+    } catch { /* */ }
     return json(200, { ok: false, error: String(e) });
   }
 });
