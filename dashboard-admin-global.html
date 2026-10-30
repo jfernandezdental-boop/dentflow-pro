@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DentFlow · Admin Global Multi-tenant</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#0B1220;--bg:#EEF1F6;--teal:#0D9488;--border:#E2E8F0;--muted:#64748B;--white:#fff;--rose:#E11D48}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:Outfit,sans-serif;background:var(--bg);color:var(--ink)}
+.shell{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+@media(max-width:900px){.shell{grid-template-columns:1fr}}
+.side{background:linear-gradient(180deg,#0B1220,#134E4A);color:#fff;padding:18px 14px}
+.brand{font-family:'Playfair Display',serif;font-size:18px;margin-bottom:14px}
+.nb{display:block;width:100%;text-align:left;border:0;background:transparent;color:#ccc;padding:10px;border-radius:8px;cursor:pointer;font:inherit;margin:2px 0}
+.nb.on,.nb:hover{background:rgba(20,184,166,.25);color:#fff}
+.main{padding:22px}.h1{font-family:'Playfair Display',serif;font-size:26px}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:14px 0}
+@media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px}
+.kpi-v{font-size:22px;font-weight:700}.kpi-l{font-size:11px;color:var(--muted)}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:12px;overflow:auto}
+.btn{background:var(--teal);color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600}
+.btn.sec{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
+.btn.danger{background:var(--rose)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:10px;text-transform:uppercase;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}.tg{background:#D1FAE5;color:#047857}.tr{background:#FEE2E2;color:#B91C1C}
+.fi{width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font:inherit;margin-bottom:8px}
+.panel{display:none}.panel.on{display:block}.muted{color:var(--muted);font-size:12px}.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pill{background:#CCFBF1;color:#0F766E;font-size:11px;font-weight:700;padding:6px 12px;border-radius:99px}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="side">
+<div class="brand">DentFlow · Global</div>
+<button class="nb on" onclick="go('ov',this)">Resumen global</button>
+<button class="nb" onclick="go('cl',this)">Clinicas / Tenants</button>
+<button class="nb" onclick="go('new',this)">Nueva clinica</button>
+<button class="nb" onclick="go('us',this)">Usuarios y roles</button>
+<button class="nb" onclick="go('st',this)">Stats por clinica</button>
+<button class="nb" onclick="go('se',this)">Claves API</button>
+<button class="nb" onclick="go('bo',this)">Bots IA</button>
+</aside>
+<main class="main">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+<div><div class="h1" id="title">Resumen global</div><p class="muted" id="sub">Multi-tenant · super admin</p></div>
+<span class="pill">SUPER ADMIN</span>
+</div>
+
+<div class="panel on" id="p-ov">
+<div class="kpis">
+<div class="kpi"><div class="kpi-v" id="g1">0</div><div class="kpi-l">Clinicas</div></div>
+<div class="kpi"><div class="kpi-v" id="g2">0</div><div class="kpi-l">Activas</div></div>
+<div class="kpi"><div class="kpi-v" id="g3">0</div><div class="kpi-l">Doctores</div></div>
+<div class="kpi"><div class="kpi-v" id="g4">0</div><div class="kpi-l">Staff admin</div></div>
+<div class="kpi"><div class="kpi-v" id="g5">0</div><div class="kpi-l">Pacientes</div></div>
+<div class="kpi"><div class="kpi-v" id="g6">0</div><div class="kpi-l">Citas 30d</div></div>
+</div>
+<div class="card"><table><thead><tr><th>Clinica</th><th>Plan</th><th>Estado</th><th>Docs</th><th>Staff</th><th>Pacientes</th><th></th></tr></thead><tbody id="tbOv"></tbody></table></div>
+</div>
+
+<div class="panel" id="p-cl">
+<div class="card"><table><thead><tr><th>Nombre</th><th>Slug</th><th>Contacto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="tbCl"></tbody></table></div>
+</div>
+
+<div class="panel" id="p-new">
+<div class="card">
+<input class="fi" id="nNom" placeholder="Nombre clinica"/>
+<div class="g2"><input class="fi" id="nSlug" placeholder="slug"/><select class="fi" id="nPlan"><option value="basico">Basico</option><option value="pro" selected>Pro</option><option value="premium">Premium</option></select></div>
+<div class="g2"><input class="fi" id="nEmail" placeholder="Email clinica"/><input class="fi" id="nTel" placeholder="Telefono"/></div>
+<input class="fi" id="aNom" placeholder="Nombre admin"/>
+<div class="g2"><input class="fi" id="aEmail" placeholder="Email admin login"/><input class="fi" id="aPass" type="password" placeholder="Password temporal"/></div>
+<label class="muted"><input type="checkbox" id="nSeed" checked/> Sembrar 2 doctores + recepcion</label>
+<p style="margin-top:10px"><button class="btn" onclick="crear()">Crear tenant</button></p>
+<p class="muted" id="nMsg"></p>
+</div></div>
+
+<div class="panel" id="p-us">
+<div class="card"><table><thead><tr><th>Usuario</th><th>Email</th><th>Rol</th><th>Clinica</th><th></th></tr></thead><tbody id="tbUs"></tbody></table>
+<p class="muted">Roles: super_admin, admin, doctor, recepcionista. JWT claims + RPC asignar_rol en produccion.</p></div>
+</div>
+
+<div class="panel" id="p-st">
+<div class="card">
+<select class="fi" id="stSel" onchange="statOne()"></select>
+<div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+<div class="kpi"><div class="kpi-v" id="st1">—</div><div class="kpi-l">Doctores</div></div>
+<div class="kpi"><div class="kpi-v" id="st2">—</div><div class="kpi-l">Staff</div></div>
+<div class="kpi"><div class="kpi-v" id="st3">—</div><div class="kpi-l">Pacientes</div></div>
+<div class="kpi"><div class="kpi-v" id="st4">—</div><div class="kpi-l">Citas 30d</div></div>
+</div></div>
+</div>
+
+<div class="panel" id="p-se">
+<div class="card">
+<p class="muted">Las claves reales van en Supabase Secrets / Vercel Env, no en el HTML.</p>
+<input class="fi" placeholder="XAI_API_KEY configurada en secrets? (si/no)" id="sx"/>
+<input class="fi" placeholder="SENDGRID_API_KEY" id="ss"/>
+<input class="fi" placeholder="SENDGRID_FROM_EMAIL" id="sf"/>
+<input class="fi" placeholder="DEFAULT_CONSULTORIO_ID / META o TWILIO" id="sw"/>
+<button class="btn" onclick="localStorage.setItem('dentflow_admin_secrets_meta',JSON.stringify({x:sx.value,s:ss.value,f:sf.value,w:sw.value}));alert('Checklist local OK')">Guardar checklist</button>
+</div></div>
+
+<div class="panel" id="p-bo">
+<div class="card"><table><thead><tr><th>Clinica</th><th>Bot IA</th><th></th></tr></thead><tbody id="tbBo"></tbody></table>
+<p class="muted">Functions: whatsapp-grok-webhook, enviar-proforma, grok-assistant</p></div>
+</div>
+</main></div>
+<script>
+const K='dentflow_consultorios_demo', U='dentflow_profiles_demo';
+function clinics(){let d=JSON.parse(localStorage.getItem(K)||'null');if(d&&d.length)return d;
+d=[{id:'c1',nombre:'Clinica Principal',slug:'principal',plan:'pro',activo:true,email:'admin@clinica.com',telefono:'+593990000001',doctores:3,staff:2,pacientes:120,citas30:85,bot_ia:true},
+{id:'c2',nombre:'Sonrisa Norte',slug:'norte',plan:'basico',activo:true,email:'norte@clinica.com',telefono:'+593990000002',doctores:2,staff:1,pacientes:64,citas30:40,bot_ia:true}];
+localStorage.setItem(K,JSON.stringify(d));return d}
+function save(a){localStorage.setItem(K,JSON.stringify(a))}
+function go(id,el){
+document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+document.getElementById('p-'+id).classList.add('on');if(el)el.classList.add('on');
+const m={ov:['Resumen global','Todas las clinicas'],cl:['Clinicas','Tenants'],new:['Nueva clinica','Provisioning'],us:['Usuarios y roles','JWT / perfiles'],st:['Stats','Por clinica'],se:['Claves API','Secrets checklist'],bo:['Bots IA','WhatsApp / Grok']};
+document.getElementById('title').textContent=m[id][0];document.getElementById('sub').textContent=m[id][1];
+if(id==='st'){stSel.innerHTML=clinics().map(c=>'<option value="'+c.id+'">'+c.nombre+'</option>').join('');statOne()}
+}
+function refresh(){
+const list=clinics();
+document.getElementById('g1').textContent=list.length;
+document.getElementById('g2').textContent=list.filter(c=>c.activo!==false).length;
+document.getElementById('g3').textContent=list.reduce((s,c)=>s+(c.doctores||0),0);
+document.getElementById('g4').textContent=list.reduce((s,c)=>s+(c.staff||0),0);
+document.getElementById('g5').textContent=list.reduce((s,c)=>s+(c.pacientes||0),0);
+document.getElementById('g6').textContent=list.reduce((s,c)=>s+(c.citas30||0),0);
+tbOv.innerHTML=list.map(c=>'<tr><td><b>'+c.nombre+'</b></td><td>'+c.plan+'</td><td>'+(c.activo!==false?'<span class="tag tg">Activa</span>':'<span class="tag tr">Off</span>')+'</td><td>'+(c.doctores||0)+'</td><td>'+(c.staff||0)+'</td><td>'+(c.pacientes||0)+'</td><td><button class="btn sec" onclick="toggle(\''+c.id+'\')">ON/OFF</button></td></tr>').join('');
+tbCl.innerHTML=list.map(c=>'<tr><td>'+c.nombre+'</td><td>'+c.slug+'</td><td class="muted">'+c.email+'<br>'+c.telefono+'</td><td>'+(c.activo!==false?'Activa':'Off')+'</td><td><button class="btn sec" onclick="toggle(\''+c.id+'\')">Toggle</button></td></tr>').join('');
+tbBo.innerHTML=list.map(c=>'<tr><td>'+c.nombre+'</td><td>'+(c.bot_ia!==false?'ON':'OFF')+'</td><td><button class="btn sec" onclick="toggleBot(\''+c.id+'\')">IA</button></td></tr>').join('');
+let users=JSON.parse(localStorage.getItem(U)||'[]');
+if(!users.length){users=[{id:'1',nombre:'Super Admin',email:'super@dentflow.local',rol:'super_admin',consultorio_id:null},{id:'2',nombre:'Admin Principal',email:'admin@clinica.com',rol:'admin',consultorio_id:'c1'},{id:'3',nombre:'Dr Ruiz',email:'ruiz@clinica.com',rol:'doctor',consultorio_id:'c1'}];localStorage.setItem(U,JSON.stringify(users))}
+tbUs.innerHTML=users.map(u=>{const cn=list.find(c=>c.id===u.consultorio_id)?.nombre||(u.rol==='super_admin'?'Global':'—');
+return '<tr><td>'+u.nombre+'</td><td class="muted">'+u.email+'</td><td>'+u.rol+'</td><td>'+cn+'</td><td><button class="btn sec" onclick="cycle(\''+u.id+'\')">Rol</button></td></tr>'}).join('');
+}
+function toggle(id){save(clinics().map(c=>c.id===id?{...c,activo:c.activo===false}:c));refresh()}
+function toggleBot(id){save(clinics().map(c=>c.id===id?{...c,bot_ia:c.bot_ia===false}:c));refresh()}
+function cycle(id){const roles=['admin','doctor','recepcionista','personal','super_admin'];const users=JSON.parse(localStorage.getItem(U)||'[]').map(u=>{if(u.id!==id)return u;const i=roles.indexOf(u.rol);return{...u,rol:roles[(i+1)%roles.length]}});localStorage.setItem(U,JSON.stringify(users));refresh()}
+function crear(){
+const nombre=nNom.value.trim();if(!nombre){nMsg.textContent='Nombre obligatorio';return}
+const id='c'+Math.random().toString(36).slice(2,8);
+const seed=nSeed.checked;
+const row={id,nombre,slug:nSlug.value.trim()||nombre.toLowerCase().replace(/\s+/g,'-'),plan:nPlan.value,email:nEmail.value,telefono:nTel.value,activo:true,bot_ia:true,doctores:seed?2:0,staff:seed?2:1,pacientes:0,citas30:0};
+save(clinics().concat([row]));
+const users=JSON.parse(localStorage.getItem(U)||'[]');
+if(aEmail.value)users.push({id:'u'+id,nombre:aNom.value||'Admin',email:aEmail.value,rol:'admin',consultorio_id:id});
+if(seed){users.push({id:'d1'+id,nombre:'Dr Ejemplo',email:'doc@'+row.slug+'.local',rol:'doctor',consultorio_id:id});users.push({id:'r1'+id,nombre:'Recepcion',email:'rec@'+row.slug+'.local',rol:'recepcionista',consultorio_id:id})}
+localStorage.setItem(U,JSON.stringify(users));
+nMsg.textContent='Clinica creada. En prod: insert consultorios + Auth signUp con app_metadata.';refresh();
+}
+function statOne(){const c=clinics().find(x=>x.id===stSel.value);if(!c)return;st1.textContent=c.doctores||0;st2.textContent=c.staff||0;st3.textContent=c.pacientes||0;st4.textContent=c.citas30||0}
+refresh();
+</script>
+</body>
+</html>

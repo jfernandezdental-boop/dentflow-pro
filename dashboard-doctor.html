@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DentFlow · Dashboard Doctor</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#0F1923;--bg:#F5F0E8;--teal:#076E6E;--border:#DDD8CE;--muted:#7A8694;--white:#fff}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:Outfit,sans-serif;background:var(--bg);color:var(--ink)}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+@media(max-width:800px){.shell{grid-template-columns:1fr}}
+.sidebar{background:var(--ink);color:#fff;padding:16px}.logo{font-family:'Playfair Display',serif;margin-bottom:16px;font-size:18px}
+.nav{display:block;width:100%;text-align:left;padding:10px;margin:4px 0;border:0;border-radius:8px;background:transparent;color:#ccc;cursor:pointer;font:inherit}
+.nav.on,.nav:hover{background:rgba(13,165,138,.3);color:#fff}
+.main{padding:20px}.h1{font-family:'Playfair Display',serif;font-size:24px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+@media(max-width:700px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:0 4px 16px rgba(0,0,0,.05)}
+.kpi-v{font-size:26px;font-weight:700}.kpi-l{font-size:12px;color:var(--muted)}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:12px}
+.btn{background:var(--teal);color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600}
+.btn.sec{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
+.muted{color:var(--muted);font-size:13px}.row{padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#E4F4F0;color:var(--teal)}
+.panel{display:none}.panel.on{display:block}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+<div class="logo">DentFlow · Doctor</div>
+<button class="nav on" data-p="hoy" onclick="go('hoy',this)">Agenda hoy</button>
+<button class="nav" data-p="pac" onclick="go('pac',this)">Pacientes</button>
+<button class="nav" data-p="cli" onclick="go('cli',this)">Clinico</button>
+<button class="nav" data-p="ia" onclick="go('ia',this)">Asistente IA</button>
+<button class="nav" data-p="stats" onclick="go('stats',this)">Rendimiento</button>
+</aside>
+<main class="main">
+<div class="h1" id="title">Agenda de hoy</div>
+<p class="muted" id="sub">Citas, confirmaciones y preparacion clinica</p>
+<div class="panel on" id="p-hoy">
+<div class="kpis">
+<div class="kpi"><div class="kpi-v" id="k1">—</div><div class="kpi-l">Citas hoy</div></div>
+<div class="kpi"><div class="kpi-v" id="k2">—</div><div class="kpi-l">Confirmadas</div></div>
+<div class="kpi"><div class="kpi-v" id="k3">—</div><div class="kpi-l">Pendientes</div></div>
+<div class="kpi"><div class="kpi-v" id="k4">—</div><div class="kpi-l">Cancel / no-show</div></div>
+</div>
+<div class="card" id="timeline"><span class="muted">Cargando agenda…</span></div>
+<p style="margin-top:12px"><button class="btn" onclick="refresh()">Actualizar</button>
+<button class="btn sec" onclick="parentNav('historia')">Historia</button>
+<button class="btn sec" onclick="parentNav('odontograma')">Odontograma</button></p>
+</div>
+<div class="panel" id="p-pac"><div class="card" id="listaPac"></div></div>
+<div class="panel" id="p-cli"><div class="card"><p class="muted">Historia, odontograma, HCU, sesiones por cita.</p>
+<button class="btn" onclick="parentNav('historia')">Abrir historia</button>
+<button class="btn sec" onclick="parentNav('odontograma')">Odontograma</button>
+<button class="btn sec" onclick="parentNav('recetario')">Recetas</button>
+<button class="btn sec" onclick="parentNav('imagenes')">Imagenes</button></div></div>
+<div class="panel" id="p-ia"><div class="card">
+<p class="muted">Grok · no diagnostica. Requiere dentflow-grok-api.js + Edge Function.</p>
+<textarea id="aiq" rows="3" style="width:100%;margin:8px 0;padding:10px;border-radius:8px;border:1px solid var(--border);font:inherit" placeholder="Resume mis citas de hoy"></textarea>
+<button class="btn" onclick="askAI()">Consultar IA</button>
+<pre id="aio" class="muted" style="margin-top:10px;white-space:pre-wrap"></pre>
+</div></div>
+<div class="panel" id="p-stats"><div class="kpis">
+<div class="kpi"><div class="kpi-v" id="s1">—</div><div class="kpi-l">Citas total</div></div>
+<div class="kpi"><div class="kpi-v" id="s2">—</div><div class="kpi-l">% confirmacion</div></div>
+</div></div>
+</main></div>
+<script>
+function go(id,el){
+ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+ document.querySelectorAll('.nav').forEach(n=>n.classList.remove('on'));
+ document.getElementById('p-'+id).classList.add('on'); if(el) el.classList.add('on');
+ const m={hoy:['Agenda de hoy','Citas y preparacion'],pac:['Pacientes','Del dia'],cli:['Clinico','Historia y odontograma'],ia:['Asistente IA','Grok'],stats:['Rendimiento','Indicadores']};
+ document.getElementById('title').textContent=(m[id]||[id])[0];
+ document.getElementById('sub').textContent=(m[id]||['',''])[1]||'';
+}
+function parentNav(mod){try{if(parent.go)parent.go(mod,null)}catch(e){alert('Abrir '+mod+' en DentFlow')}}
+function getCitas(){try{if(parent._citas)return parent._citas()||[]}catch(e){}return[]}
+function refresh(){
+ const c=getCitas(), hoy=new Date().toISOString().slice(0,10);
+ const t=c.filter(x=>(x.dateKey||x.fecha||'')===hoy);
+ document.getElementById('k1').textContent=t.length;
+ document.getElementById('k2').textContent=t.filter(x=>x.estado==='confirmada'||x.estado==='completada').length;
+ document.getElementById('k3').textContent=t.filter(x=>x.estado==='pendiente').length;
+ document.getElementById('k4').textContent=t.filter(x=>x.estado==='cancelada'||x.estado==='no_asistio').length;
+ document.getElementById('timeline').innerHTML=t.length?t.sort((a,b)=>String(a.time||a.hora).localeCompare(String(b.time||b.hora))).map(x=>'<div class="row"><strong>'+(x.time||x.hora||'')+'</strong> '+(x.patient||x.paciente||'')+' · '+(x.proc||x.motivo||'')+' <span class="tag">'+x.estado+'</span></div>').join(''):'<span class="muted">Sin citas hoy (demo/Supabase)</span>';
+ document.getElementById('listaPac').innerHTML=t.map(x=>'<div class="row">'+(x.patient||x.paciente)+' — '+(x.proc||'')+'</div>').join('')||'<span class="muted">Sin datos</span>';
+ document.getElementById('s1').textContent=c.length;
+ const conf=c.filter(x=>x.estado==='confirmada'||x.estado==='completada').length;
+ document.getElementById('s2').textContent=c.length?Math.round(conf/c.length*100)+'%':'—';
+}
+async function askAI(){
+ const q=document.getElementById('aiq').value.trim(); const o=document.getElementById('aio');
+ if(!q){o.textContent='Escribe una pregunta';return} o.textContent='…';
+ try{ const G=parent.DentflowGrok||window.DentflowGrok;
+ if(G&&G.ask){const r=await G.ask(q,{rol:'doctor',contexto:{citas:getCitas().slice(0,15)}});o.textContent=r.reply}
+ else o.textContent='Configura dentflow-grok-api.js + grok-assistant';
+ }catch(e){o.textContent=String(e)}
+}
+refresh();
+</script>
+</body>
+</html>
