@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DentFlow · Modulo financiero</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#0F1923;--bg:#F3F0EA;--teal:#076E6E;--teal2:#0DA58A;--rose:#C0394A;--amber:#C47B0A;--border:#DDD8CE;--muted:#7A8694;--white:#fff}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:Outfit,sans-serif;background:var(--bg);color:var(--ink);padding:20px;min-height:100vh}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.h1{font-family:'Playfair Display',serif;font-size:24px}.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.seg{display:flex;background:#fff;border:1px solid var(--border);border-radius:10px;padding:3px}
+.seg button{border:0;background:0;padding:8px 14px;border-radius:8px;font:inherit;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--teal);color:#fff}
+.btn{background:var(--teal);color:#fff;border:0;padding:9px 14px;border-radius:9px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.btn.sec{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.05);border-left:4px solid var(--teal)}
+.kpi.rose{border-left-color:var(--rose)}.kpi.amber{border-left-color:var(--amber)}
+.kpi-v{font-family:'Playfair Display',serif;font-size:22px;font-weight:700}.kpi-l{font-size:12px;color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.05)}
+.card-t{font-weight:700;font-size:14px;margin-bottom:10px}.muted{color:var(--muted);font-size:12px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:120px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
+.bar{width:100%;max-width:28px;border-radius:5px 5px 2px 2px;background:linear-gradient(180deg,var(--teal2),var(--teal);min-height:3px}
+.bar-lbl{font-size:9px;color:var(--muted)}
+.bucket{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bkt{background:#FDFAF4;border:1px solid var(--border);border-radius:10px;padding:10px}.bkt-v{font-weight:700;font-size:16px}.bkt-l{font-size:11px;color:var(--muted)}
+.tabs{display:flex;background:#fff;border:1px solid var(--border);border-radius:12px 12px 0 0;overflow:hidden}
+.tab{flex:1;padding:10px;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.tab.on{color:var(--teal);border-bottom-color:var(--teal);background:#FDFAF4}
+.panel{display:none;background:#fff;border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:12px}
+.panel.on{display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px 8px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:10px;text-transform:uppercase;color:var(--muted)}
+.tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px}.tg{background:#E2F7EC;color:#1E7A4A}.ta{background:#FEF3DC;color:#C47B0A}.tr{background:#FDEAEC;color:var(--rose)}
+.fi{border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+.mono{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="head">
+<div><div class="h1">Modulo financiero</div><div class="sub">Cartera · vencidos · cobros por dia, semana y mes</div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<div class="seg" id="periodSeg">
+<button type="button" class="on" onclick="setPeriod('dia',this)">Dia</button>
+<button type="button" onclick="setPeriod('semana',this)">Semana</button>
+<button type="button" onclick="setPeriod('mes',this)">Mes</button>
+</div>
+<button class="btn sec" onclick="refreshFin()">Actualizar</button>
+<button class="btn sec" onclick="exportFinCSV()">CSV</button>
+</div></div>
+
+<div class="kpis">
+<div class="kpi"><div class="kpi-v" id="kCobrado">—</div><div class="kpi-l">Cobrado en el periodo</div></div>
+<div class="kpi rose"><div class="kpi-v" id="kDeuda">—</div><div class="kpi-l">Pacientes deben</div><div class="muted" id="kDeudaN">—</div></div>
+<div class="kpi amber"><div class="kpi-v" id="kVencido">—</div><div class="kpi-l">Vencido +30 dias</div><div class="muted" id="kVencidoN">—</div></div>
+<div class="kpi"><div class="kpi-v" id="kFacturado">—</div><div class="kpi-l">Facturado periodo</div></div>
+<div class="kpi"><div class="kpi-v" id="kCobertura">—</div><div class="kpi-l">% cobrado vs facturado</div></div>
+</div>
+
+<div class="grid">
+<div class="card"><div class="card-t">Evolucion de cobros <span class="muted" id="chartTitle">Dia</span></div><div class="bars" id="chartBars"></div></div>
+<div class="card"><div class="card-t">Antiguedad de cartera</div>
+<div class="bucket">
+<div class="bkt"><div class="bkt-v" id="b0">$0</div><div class="bkt-l">0–7 d · <span id="b0n">0</span></div></div>
+<div class="bkt"><div class="bkt-v" id="b1">$0</div><div class="bkt-l">8–30 d · <span id="b1n">0</span></div></div>
+<div class="bkt"><div class="bkt-v" id="b2">$0</div><div class="bkt-l">31–60 d · <span id="b2n">0</span></div></div>
+<div class="bkt"><div class="bkt-v" id="b3">$0</div><div class="bkt-l">+60 d · <span id="b3n">0</span></div></div>
+</div></div>
+</div>
+
+<div class="tabs">
+<div class="tab on" onclick="finTab(this,'deudores')">Pacientes que deben</div>
+<div class="tab" onclick="finTab(this,'vencidos')">Vencidos</div>
+<div class="tab" onclick="finTab(this,'mov')">Movimientos</div>
+<div class="tab" onclick="finTab(this,'top')">Top deudores</div>
+</div>
+<div class="panel on" id="panel-deudores">
+<input class="fi" id="qDeuda" placeholder="Buscar paciente" oninput="renderDeudores()" style="margin-bottom:10px;max-width:240px"/>
+<div style="overflow:auto"><table><thead><tr><th>Paciente</th><th>Concepto</th><th>Total</th><th>Pagado</th><th>Saldo</th><th>Dias</th><th>Riesgo</th></tr></thead><tbody id="tbDeudores"></tbody></table></div>
+</div>
+<div class="panel" id="panel-vencidos"><div style="overflow:auto"><table><thead><tr><th>Paciente</th><th>Saldo</th><th>Dias</th><th>Fecha</th><th>Riesgo</th></tr></thead><tbody id="tbVencidos"></tbody></table></div></div>
+<div class="panel" id="panel-mov"><div style="overflow:auto"><table><thead><tr><th>Fecha</th><th>Paciente</th><th>Tipo</th><th>Monto</th><th>Metodo</th></tr></thead><tbody id="tbMov"></tbody></table></div></div>
+<div class="panel" id="panel-top"><div style="overflow:auto"><table><thead><tr><th>#</th><th>Paciente</th><th>Cuentas</th><th>Saldo</th><th>Max dias</th></tr></thead><tbody id="tbTop"></tbody></table></div></div>
+
+<script>
+let PERIOD='dia';
+function money(n){const v=Number(n)||0;try{if(parent.fmtCLP)return parent.fmtCLP(v)}catch(e){}return new Intl.NumberFormat('es-EC',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(v)}
+function parseDate(s){if(!s)return null;const d=new Date(String(s).slice(0,10)+'T12:00:00');return isNaN(d)?null:d}
+function daysBetween(a,b){return Math.floor((b-a)/86400000)}
+function cargoPagado(c){try{if(parent.cargoPagado)return parent.cargoPagado(c)}catch(e){}if(Array.isArray(c.pagos))return c.pagos.reduce((s,p)=>s+Number(p.monto||0),0);return Number(c.pagado||0)}
+function cargoSaldo(c){try{if(parent.cargoSaldo)return parent.cargoSaldo(c)}catch(e){}return Math.max(0,Number(c.total||0)-cargoPagado(c))}
+function loadCargos(){
+ try{if(parent){if(Array.isArray(parent.pagosData))return parent.pagosData;if(parent.getPagosData)return parent.getPagosData()||[]}}catch(e){}
+ const d=n=>{const x=new Date();x.setDate(x.getDate()-n);return x.toISOString().slice(0,10)};
+ return [
+ {id:'1',patient:'Ana Lopez',proc:'Ortodoncia',total:350,pagado:100,fecha:d(2),pagos:[{monto:100,fecha:d(1),metodo:'Transferencia'}]},
+ {id:'2',patient:'Carlos Ruiz',proc:'Implante',total:1200,pagado:0,fecha:d(45),pagos:[]},
+ {id:'3',patient:'Maria Vega',proc:'Blanqueamiento',total:280,pagado:280,fecha:d(5),pagos:[{monto:280,fecha:d(4),metodo:'Tarjeta'}]},
+ {id:'4',patient:'Jose Perez',proc:'Endodoncia',total:180,pagado:50,fecha:d(12),pagos:[{monto:50,fecha:d(10),metodo:'Efectivo'}]},
+ {id:'5',patient:'Lucia Mora',proc:'Corona',total:450,pagado:0,fecha:d(70),pagos:[]},
+ {id:'6',patient:'Pedro Salas',proc:'Limpieza',total:45,pagado:45,fecha:d(0),pagos:[{monto:45,fecha:d(0),metodo:'Efectivo'}]},
+ {id:'7',patient:'Elena Diaz',proc:'Cirugia',total:600,pagado:200,fecha:d(35),pagos:[{monto:200,fecha:d(30),metodo:'Transferencia'}]}
+ ];
+}
+function periodRange(){const end=new Date();end.setHours(12,0,0,0);const start=new Date(end);if(PERIOD==='semana')start.setDate(start.getDate()-6);else if(PERIOD==='mes')start.setDate(1);return{start,end}}
+function inPeriod(dateStr,range){const d=parseDate(dateStr);if(!d)return false;return d>=range.start&&d<=range.end}
+function riskOf(days){if(days<=7)return{key:'bajo',label:'Al dia',cls:'tg'};if(days<=30)return{key:'medio',label:'8-30 d',cls:'ta'};if(days<=60)return{key:'alto',label:'31-60 d',cls:'ta'};return{key:'critico',label:'+60 d',cls:'tr'}}
+function setPeriod(p,el){PERIOD=p;document.querySelectorAll('#periodSeg button').forEach(b=>b.classList.remove('on'));if(el)el.classList.add('on');chartTitle.textContent={dia:'Hoy',semana:'7 dias',mes:'Mes'}[p];refreshFin()}
+function finTab(el,id){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));el.classList.add('on');document.getElementById('panel-'+id).classList.add('on')}
+function enrich(c){const total=Number(c.total||0),pagado=cargoPagado(c),saldo=Math.max(0,total-pagado);const fecha=c.fecha||c.date||c.created_at;const d=parseDate(fecha)||new Date();const dias=Math.max(0,daysBetween(d,new Date()));return{...c,total,pagado,saldo,fecha,dias,risk:riskOf(dias),nombre:c.patient||c.paciente||'Paciente',concepto:c.proc||c.motivo||'—'}}
+function refreshFin(){
+ const cargos=loadCargos().map(enrich), range=periodRange();
+ let cobrado=0; const mov=[];
+ cargos.forEach(c=>{(Array.isArray(c.pagos)?c.pagos:[]).forEach(p=>{const f=p.fecha||c.fecha,m=Number(p.monto||0);if(inPeriod(f,range)&&m){cobrado+=m;mov.push({fecha:f,paciente:c.nombre,tipo:'Cobro',monto:m,metodo:p.metodo||'—'})}});if(inPeriod(c.fecha,range))mov.push({fecha:c.fecha,paciente:c.nombre,tipo:'Cargo',monto:c.total,metodo:'—'})});
+ const deudores=cargos.filter(c=>c.saldo>0.01); const deuda=deudores.reduce((s,c)=>s+c.saldo,0);
+ const vencidos=deudores.filter(c=>c.dias>30); const venc=vencidos.reduce((s,c)=>s+c.saldo,0);
+ const fact=cargos.filter(c=>inPeriod(c.fecha,range)).reduce((s,c)=>s+c.total,0);
+ const cov=fact>0?Math.round(cobrado/fact*100):(cobrado?100:0);
+ kCobrado.textContent=money(cobrado);kDeuda.textContent=money(deuda);kDeudaN.textContent=deudores.length+' deudores';
+ kVencido.textContent=money(venc);kVencidoN.textContent=vencidos.length+' cuentas';kFacturado.textContent=money(fact);kCobertura.textContent=cov+'%';
+ const bk=[{el:b0,n:b0n,min:0,max:7},{el:b1,n:b1n,min:8,max:30},{el:b2,n:b2n,min:31,max:60},{el:b3,n:b3n,min:61,max:9999}];
+ bk.forEach(b=>{b.sum=0;b.cnt=0}); deudores.forEach(c=>{const b=bk.find(x=>c.dias>=x.min&&c.dias<=x.max);if(b){b.sum+=c.saldo;b.cnt++}});
+ bk.forEach(b=>{b.el.textContent=money(b.sum||0);b.n.textContent=b.cnt||0});
+ const chart=[];
+ if(PERIOD==='semana'){for(let i=6;i>=0;i--){const d=new Date(range.end);d.setDate(d.getDate()-i);chart.push({key:d.toISOString().slice(0,10),label:d.toISOString().slice(5,10),cobrado:0})}}
+ else if(PERIOD==='mes'){for(let day=1;day<=28;day+=3)chart.push({key:String(day),label:String(day),cobrado:0})}
+ else {for(let h=8;h<=18;h+=2)chart.push({key:String(h),label:h+':00',cobrado:0})}
+ cargos.forEach(c=>{(c.pagos||[]).forEach(p=>{const f=String(p.fecha||'').slice(0,10),m=Number(p.monto||0);let s=chart.find(x=>x.key===f);if(PERIOD==='semana'&&s&&m)s.cobrado+=m;if(PERIOD!=='semana'&&inPeriod(f,range)&&chart[0])chart[Math.min(chart.length-1,1)].cobrado+=m})});
+ const maxV=Math.max(1,...chart.map(x=>x.cobrado));
+ chartBars.innerHTML=chart.map(x=>'<div class="bar-col"><div class="bar" style="height:'+Math.round(x.cobrado/maxV*100)+'%"></div><div class="bar-lbl">'+x.label+'</div></div>').join('');
+ window.__fin={cargos,deudores,vencidos,movimientos:mov};renderDeudores();renderVencidos();renderMov();renderTop();
+}
+function renderDeudores(){const q=(qDeuda.value||'').toLowerCase();let rows=(__fin.deudores||[]).filter(c=>!q||c.nombre.toLowerCase().includes(q));rows.sort((a,b)=>b.saldo-a.saldo);
+tbDeudores.innerHTML=rows.map(c=>'<tr><td><b>'+c.nombre+'</b></td><td class="muted">'+c.concepto+'</td><td class="mono">'+money(c.total)+'</td><td class="mono">'+money(c.pagado)+'</td><td class="mono" style="color:var(--rose);font-weight:700">'+money(c.saldo)+'</td><td>'+c.dias+'</td><td><span class="tag '+c.risk.cls+'">'+c.risk.label+'</span></td></tr>').join('')||'<tr><td colspan="7" class="muted">Sin saldos</td></tr>'}
+function renderVencidos(){const rows=(__fin.vencidos||[]).slice().sort((a,b)=>b.dias-a.dias);
+tbVencidos.innerHTML=rows.map(c=>'<tr><td><b>'+c.nombre+'</b><div class="muted">'+c.concepto+'</div></td><td class="mono" style="color:var(--rose);font-weight:700">'+money(c.saldo)+'</td><td>'+c.dias+'</td><td class="muted">'+String(c.fecha).slice(0,10)+'</td><td><span class="tag '+c.risk.cls+'">'+c.risk.label+'</span></td></tr>').join('')||'<tr><td colspan="5" class="muted">Sin vencidos</td></tr>'}
+function renderMov(){const rows=(__fin.movimientos||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+tbMov.innerHTML=rows.map(m=>'<tr><td class="muted">'+String(m.fecha).slice(0,10)+'</td><td>'+m.paciente+'</td><td><span class="tag '+(m.tipo==='Cobro'?'tg':'tt')+'">'+m.tipo+'</span></td><td class="mono">'+money(m.monto)+'</td><td class="muted">'+m.metodo+'</td></tr>').join('')||'<tr><td colspan="5" class="muted">Sin movimientos</td></tr>'}
+function renderTop(){const map={};(__fin.deudores||[]).forEach(c=>{if(!map[c.nombre])map[c.nombre]={nombre:c.nombre,n:0,saldo:0,dias:0};map[c.nombre].n++;map[c.nombre].saldo+=c.saldo;map[c.nombre].dias=Math.max(map[c.nombre].dias,c.dias)});
+const rows=Object.values(map).sort((a,b)=>b.saldo-a.saldo).slice(0,15);
+tbTop.innerHTML=rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+r.nombre+'</b></td><td>'+r.n+'</td><td class="mono" style="color:var(--rose);font-weight:700">'+money(r.saldo)+'</td><td>'+r.dias+'</td></tr>').join('')||'<tr><td colspan="5" class="muted">—</td></tr>'}
+function exportFinCSV(){const rows=__fin.deudores||[];const lines=[['Paciente','Concepto','Total','Pagado','Saldo','Dias','Riesgo'].join(',')];rows.forEach(c=>lines.push([c.nombre,c.concepto,c.total,c.pagado,c.saldo,c.dias,c.risk.label].map(x=>'"'+x+'"').join(',')));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='cartera.csv';a.click()}
+refreshFin();
+</script>
+</body>
+</html>
