@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>DentFlow · Activar Bot IA</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+<style>
+:root{--ink:#0F1923;--bg:#F3F0EA;--teal:#076E6E;--border:#DDD8CE;--muted:#7A8694;--ok:#1E7A4A;--rose:#C0394A;--amber:#C47B0A}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:Outfit,sans-serif;background:var(--bg);color:var(--ink);padding:20px;min-height:100vh}
+.wrap{max-width:700px;margin:0 auto}.h1{font-family:'Playfair Display',serif;font-size:24px}.sub{color:var(--muted);font-size:14px;margin:6px 0 18px;line-height:1.4}
+.card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:12px;box-shadow:0 6px 20px rgba(0,0,0,.05)}
+.card h2{font-size:15px;margin-bottom:6px}.hint{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.4}
+.fl{margin-bottom:10px}label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.fi{width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;font-size:14px}
+.fi:focus{outline:none;border-color:var(--teal)}
+.btn{width:100%;background:var(--teal);color:#fff;border:0;padding:12px;border-radius:11px;font:inherit;font-weight:700;cursor:pointer;margin-top:6px}
+.btn.sec{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
+.switch{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#F8F6F1;border-radius:12px;margin-bottom:10px;font-weight:600}
+.msg{display:none;margin-top:12px;padding:12px;border-radius:10px;font-size:13px}
+.msg.ok{display:block;background:#E2F7EC;color:var(--ok)}.msg.err{display:block;background:#FDEAEC;color:var(--rose)}.msg.info{display:block;background:#E4F4F0;color:var(--teal)}
+.steps{display:flex;gap:6px;margin-bottom:14px}.step{flex:1;text-align:center;padding:8px;border-radius:10px;background:#fff;border:1.5px solid var(--border);font-size:11px;font-weight:600;color:var(--muted)}
+.step.done{border-color:var(--ok);color:var(--ok)}.step.on{border-color:var(--teal);color:var(--teal)}
+a{color:var(--teal);font-weight:600}.badge{font-size:10px;background:#FEF3DC;color:var(--amber);padding:2px 7px;border-radius:6px;font-weight:700}
+.pw{position:relative}.pw .fi{padding-right:40px}.pw button{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:0;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="h1">Activar Bot IA</div>
+<p class="sub">Solo administrador. Pegue las claves, encienda el interruptor y guarde. Sin comandos tecnicos.</p>
+<div class="steps">
+<div class="step on" id="s1">1. Grok</div>
+<div class="step" id="s2">2. WhatsApp</div>
+<div class="step" id="s3">3. Correo</div>
+<div class="step" id="s4">4. Activar</div>
+</div>
+
+<div class="card">
+<h2>1. Clave Grok (xAI)</h2>
+<p class="hint">Cree la clave aqui: <a href="https://console.x.ai" target="_blank" rel="noopener">console.x.ai</a> y peguela abajo.</p>
+<div class="fl"><label>API Key</label><div class="pw"><input class="fi" id="xaiKey" type="password" placeholder="xai-…"/><button type="button" onclick="t('xaiKey')">👁</button></div></div>
+<div class="fl"><label>Modelo</label><input class="fi" id="xaiModel" value="grok-2"/></div>
+</div>
+
+<div class="card">
+<h2>2. WhatsApp <span class="badge">citas</span></h2>
+<p class="hint">Opcional. Puede dejar "Solo panel" y completar WhatsApp despues.</p>
+<div class="fl"><label>Proveedor</label>
+<select class="fi" id="waProv" onchange="wa()">
+<option value="none">Solo panel (sin WhatsApp)</option>
+<option value="meta">Meta Cloud API</option>
+<option value="twilio">Twilio</option>
+</select></div>
+<div id="waMeta" style="display:none">
+<div class="fl"><label>Token Meta</label><input class="fi" id="metaToken" type="password"/></div>
+<div class="fl"><label>Phone Number ID</label><input class="fi" id="metaPhoneId"/></div>
+</div>
+<div id="waTwilio" style="display:none">
+<div class="fl"><label>Account SID</label><input class="fi" id="twSid"/></div>
+<div class="fl"><label>Auth Token</label><input class="fi" id="twToken" type="password"/></div>
+<div class="fl"><label>From (whatsapp:+...)</label><input class="fi" id="twFrom"/></div>
+</div>
+</div>
+
+<div class="card">
+<h2>3. Correo proformas (opcional)</h2>
+<p class="hint"><a href="https://app.sendgrid.com" target="_blank" rel="noopener">SendGrid</a> — API key + email remitente verificado.</p>
+<div class="fl"><label>SendGrid API Key</label><input class="fi" id="sgKey" type="password"/></div>
+<div class="fl"><label>Email remitente</label><input class="fi" id="sgFrom" type="email" placeholder="noreply@clinica.com"/></div>
+</div>
+
+<div class="card">
+<h2>4. Encender</h2>
+<div class="switch"><span>Bot IA activo</span>
+<label><input type="checkbox" id="botOn"/> ON</label>
+</div>
+<div class="fl"><label>ID clinica (automatico si hay sesion)</label><input class="fi" id="consultorioId"/></div>
+<button class="btn" onclick="guardar()">Guardar y activar</button>
+<button class="btn sec" onclick="probar()">Probar conexion Grok</button>
+<div class="msg" id="msg"></div>
+</div>
+</div>
+<script>
+const LS='dentflow_bot_ia_config_v1';
+function t(id){const e=document.getElementById(id);e.type=e.type==='password'?'text':'password'}
+function wa(){const v=waProv.value;waMeta.style.display=v==='meta'?'block':'none';waTwilio.style.display=v==='twilio'?'block':'none'}
+function show(tx,k){msg.className='msg '+(k||'info');msg.textContent=tx}
+function read(){return{xai_api_key:xaiKey.value.trim(),xai_model:xaiModel.value.trim()||'grok-2',whatsapp_provider:waProv.value,meta_wa_token:metaToken.value.trim(),meta_wa_phone_number_id:metaPhoneId.value.trim(),twilio_account_sid:twSid.value.trim(),twilio_auth_token:twToken.value.trim(),twilio_whatsapp_from:twFrom.value.trim(),sendgrid_api_key:sgKey.value.trim(),sendgrid_from_email:sgFrom.value.trim(),bot_ia_activo:botOn.checked,consultorio_id:consultorioId.value.trim(),updated_at:new Date().toISOString()}}
+function guardar(){
+ const c=read();
+ if(!c.xai_api_key){show('Pegue la API Key de Grok (paso 1).','err');return}
+ try{localStorage.setItem(LS,JSON.stringify(c))}catch(e){}
+ show(c.bot_ia_activo?'Listo. Bot IA ENCENDIDO. Configure WhatsApp cuando quiera mensajes de pacientes.':'Guardado. Bot en pausa (OFF).','ok');
+}
+async function probar(){
+ const key=xaiKey.value.trim();if(!key){show('Pegue la API Key.','err');return}
+ show('Probando…','info');
+ try{
+  const res=await fetch('https://api.x.ai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify({model:xaiModel.value||'grok-2',max_tokens:30,messages:[{role:'user',content:'Responde OK'}]})});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){show('Error: '+(data.error?.message||res.status),'err');return}
+  show('Clave valida. Grok responde bien.','ok');
+ }catch(e){show('La prueba desde el navegador puede fallar por CORS; en servidor si funciona. '+e.message,'err')}
+}
+try{const c=JSON.parse(localStorage.getItem(LS)||'null');if(c){if(c.xai_api_key)xaiKey.value=c.xai_api_key;if(c.xai_model)xaiModel.value=c.xai_model;if(c.whatsapp_provider)waProv.value=c.whatsapp_provider;botOn.checked=!!c.bot_ia_activo;if(c.consultorio_id)consultorioId.value=c.consultorio_id;wa()}}catch(e){}
+try{const s=JSON.parse(sessionStorage.getItem('df_session')||'{}');if(s.consultorio_id)consultorioId.value=s.consultorio_id}catch(e){}
+</script>
+</body>
+</html>
